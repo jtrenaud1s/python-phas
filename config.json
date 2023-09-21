@@ -1,7 +1,7 @@
 {
-  "toggle_timer": "1",
-  "toggle_settings": "ctrl_l+shift+s",
-  "toggle_crosshair": "ctrl_l+shift+c",
-  "toggle_visibility": "ctrl_l+shift+a",
-  "quit": "ctrl_l+shift+q"
+    "toggle_timer": "1",
+    "toggle_settings": "ctrl_l+shift+s",
+    "toggle_crosshair": "ctrl_l+shift+c",
+    "toggle_visibility": "ctrl_l+shift+a",
+    "quit": "ctrl_l+shift+q"
 }

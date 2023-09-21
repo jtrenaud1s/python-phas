@@ -12,8 +12,6 @@ class GameOverlay(QWidget):
         super().__init__()
         self.keybind_manager = KeybindManager(self)
         
-        self.config_window = ConfigWindow(self, self.keybind_manager)
-
         # Set the window to be transparent and always on top
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.WindowTransparentForInput)
@@ -31,6 +29,9 @@ class GameOverlay(QWidget):
         # Add the SmudgeTimer widget to the layout
         self.countdown_timer.setGeometry(0, 0, 400, 125)
         self.countdown_timer.move(self.width() - self.countdown_timer.width(), 0)
+
+        self.config_window = ConfigWindow(self, self.keybind_manager)
+
 
     def toggle_settings_action(self):  
         if self.config_window.isVisible():
