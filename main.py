@@ -15,6 +15,7 @@ class PhasOverlay(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.check_target_window)
         self.timer.start(1000)  # Check every second
+        self.time_elapsed = QTime(0, 0)
         
 
     def check_target_window(self):
@@ -23,7 +24,6 @@ class PhasOverlay(QWidget):
                 rect = ctypes.wintypes.RECT()
                 ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
                 self.overlay = GameOverlay(rect)
-                self.overlay.keybind_manager.setup_keybinds(self.overlay)
                 self.overlay.show()
                 self.timer.stop()
             else:
@@ -38,10 +38,11 @@ def generate_default_config():
     if not os.path.exists('config.json'):
         with open('config.json', 'w') as f:
             json.dump({
-              'toggle_timer': 'ctrl+shift+t',
-              'toggle_settings': 'ctrl+shift+s', 
-              'toggle_visibility': 'ctrl+shift+a', 
-              'quit': 'ctrl+shift+q'
+              'toggle_timer': 't',
+              'toggle_crosshair': 'ctrl_l+shift+c',
+              'toggle_settings': 'ctrl_l+shift+s', 
+              'toggle_visibility': 'ctrl_l+shift+a', 
+              'quit': 'ctrl_l+shift+q'
               }, f, indent=4)
 
 def signal_handler(signal, frame):
@@ -56,4 +57,4 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     phasOverlay = PhasOverlay()
     
-    exit(app.exec_())
+    sys.exit(app.exec_())

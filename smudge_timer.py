@@ -1,5 +1,6 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMetaObject
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QGridLayout
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMetaObject, QUrl
 from PyQt5.QtGui import QPainter, QColor, QPen
 
 class SmudgeBar(QProgressBar):
@@ -26,8 +27,8 @@ class SmudgeBar(QProgressBar):
         pen = QPen(QColor(0, 0, 0))
         pen.setWidth(2)
         painter.setPen(pen)
-        painter.drawLine(self.width() / 2, 0, self.width() / 2, self.height())
-        painter.drawLine(self.width() * 2 / 3, 0, self.width() * 2 / 3, self.height())
+        painter.drawLine(int(self.width() / 2), 0, int(self.width() / 2), self.height())
+        painter.drawLine(int(self.width() * 2 / 3), 0, int(self.width() * 2 / 3), self.height())
 
 class SmudgeTimer(QWidget):
     time_updated = pyqtSignal(int)
@@ -41,32 +42,52 @@ class SmudgeTimer(QWidget):
         self.timer.timeout.connect(self.update_time)
         self.timer.setInterval(1000)
 
+        self.countdown_audio = QMediaPlayer()
+        self.countdown_audio.setMedia(QMediaContent(QUrl.fromLocalFile("./countdown.mp3")))
+
         self.progress_bar = SmudgeBar(self)
+
+        layout = QGridLayout()
         
         # Add a label for the progress bar
         self.label = QLabel(self)
         self.label.setAlignment(Qt.AlignCenter)
-        self.label.setStyleSheet("color: white; font-size: 16pt;")
+        self.label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
         self.label.setText(self.format_time(self.remaining_time))
+
+        self.ghost_label = QLabel(self)
+        self.ghost_label.setAlignment(Qt.AlignCenter)
+        self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        self.ghost_label.setText("None")
+
+        self.timer_state_label = QLabel(self)
+        self.timer_state_label.setFixedSize(10, 10)  # Set a fixed size for the label
+        self.timer_state_label.setStyleSheet("background-color: red; border-radius: 10px;")        
 
         # Add the progress bar and label widgets to a container widget
         container = QWidget(self)
         container.setStyleSheet("background-color: rgba(70, 70, 70, 0.3); border-radius: 0px;")
-        container_layout = QVBoxLayout(container)
+        container_layout = QGridLayout(container)
         container_layout.setContentsMargins(10, 10, 10, 10)
-        container_layout.addWidget(self.progress_bar)
-        container_layout.addWidget(self.label)
+
+        container_layout.addWidget(self.progress_bar, 0, 0)
+        container_layout.addWidget(self.timer_state_label, 1, 0)
+        container_layout.addWidget(self.label, 1, 0, Qt.AlignCenter)
+        container_layout.addWidget(self.ghost_label, 2, 0, Qt.AlignCenter)
 
         # Add the container widget to the layout
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.addWidget(container)
+        self.setLayout(layout)
 
     def start(self):
         QMetaObject.invokeMethod(self.timer, "start", Qt.QueuedConnection)
+        self.timer_state_label.setStyleSheet("background-color: green; border-radius: 10px;")
 
     def stop(self):
         QMetaObject.invokeMethod(self.timer, "stop", Qt.QueuedConnection)
+        self.timer_state_label.setStyleSheet("background-color: red; border-radius: 10px;")
 
     def reset(self):
         self.remaining_time = self.total_time
@@ -79,6 +100,28 @@ class SmudgeTimer(QWidget):
         self.progress_bar.setValue(self.remaining_time)
         self.label.setText(self.format_time(self.remaining_time))
         self.time_updated.emit(self.remaining_time)
+
+        # play audio after 1 minute, 1.5 minutes, and 3 minutes. the audio clip counts 5 4 3 2 1 ding, the ding should play at the prior specified times with that offset.
+        if self.remaining_time == 125:
+            self.countdown_audio.play()
+        elif self.remaining_time == 95:
+            self.countdown_audio.play()
+        elif self.remaining_time == 5:
+            self.countdown_audio.play()
+
+        if self.remaining_time <= 0:  # 3 minutes elapsed
+            self.ghost_label.setText("Spirit")
+            self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        elif self.remaining_time <= 90:  # 1:30 minutes elapsed
+            self.ghost_label.setText("Standard")
+            self.ghost_label.setStyleSheet("color: yellow; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        elif self.remaining_time <= 120:  # 1 minute elapsed
+            self.ghost_label.setText("Demon")
+            self.ghost_label.setStyleSheet("color: red; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        elif self.remaining_time <= 180:  # 1 minute elapsed
+            self.ghost_label.setText("None")
+            self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        
         if self.remaining_time == 0:
             self.timer.stop()
 
