@@ -48,8 +48,6 @@ class ConfigWindow(QWidget):
 
         layout = QVBoxLayout()
 
-        
-        
         self.timer_layout = QHBoxLayout()
         self.timer_label = QLabel('Toggle Timer:')
         self.timer_label.setStyleSheet(self.labelStyle)

@@ -35,9 +35,10 @@ class GameOverlay(QWidget):
 
     def toggle_settings_action(self):  
         if self.config_window.isVisible():
-            QMetaObject.invokeMethod(self.config_window, "hide", Qt.QueuedConnection)      
+            QMetaObject.invokeMethod(self.config_window, "hide", Qt.QueuedConnection) 
         else:
-            QMetaObject.invokeMethod(self.config_window, "show", Qt.QueuedConnection)      
+            QMetaObject.invokeMethod(self.config_window, "show", Qt.QueuedConnection) 
+     
 
     def update_timer_progress(self):
         if self.timer_started:
