@@ -38,24 +38,13 @@ class GameOverlay(QWidget):
             QMetaObject.invokeMethod(self.config_window, "hide", Qt.QueuedConnection) 
         else:
             QMetaObject.invokeMethod(self.config_window, "show", Qt.QueuedConnection) 
-     
-
-    def update_timer_progress(self):
-        if self.timer_started:
-            self.remaining_time -= 1
-            if self.remaining_time <= 0:
-                self.remaining_time = 0
-                self.timer.stop()
-            self.update()  # Update the UI to redraw the progress bar
 
     def toggle_timer_action(self):
         if self.countdown_timer.timer.isActive():
             self.countdown_timer.stop()
-            self.timer_started = False
         else:
-            self.countdown_timer.start()
             self.countdown_timer.reset()
-            self.timer_started = True
+            self.countdown_timer.start()
 
 
     def toggle_visibility_action(self):
