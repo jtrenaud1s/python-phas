@@ -3,6 +3,9 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMetaObject, QUrl
 from PyQt5.QtGui import QPainter, QColor, QPen
 
+import os
+import sys
+
 class SmudgeBar(QProgressBar):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -42,8 +45,10 @@ class SmudgeTimer(QWidget):
         self.timer.timeout.connect(self.update_time)
         self.timer.setInterval(1000)
 
+        audio_file = self.resource_path("countdown.mp3")
+
         self.countdown_audio = QMediaPlayer()
-        self.countdown_audio.setMedia(QMediaContent(QUrl.fromLocalFile("./countdown.mp3")))
+        self.countdown_audio.setMedia(QMediaContent(QUrl.fromLocalFile(audio_file)))
 
         self.progress_bar = SmudgeBar(self)
 
@@ -130,3 +135,12 @@ class SmudgeTimer(QWidget):
         minutes = seconds // 60
         seconds = seconds % 60
         return f"{minutes:01d}:{seconds:02d}"
+    
+    def resource_path(self, relative_path):
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)
