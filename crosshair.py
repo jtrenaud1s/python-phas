@@ -8,6 +8,7 @@ class Crosshair(QWidget):
         self.show_crosshair = True
 
     def paintEvent(self, event):
+        super().paintEvent(event)
         if self.show_crosshair:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.Antialiasing)
