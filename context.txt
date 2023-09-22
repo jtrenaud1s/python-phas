@@ -1,0 +1,634 @@
+For context, here is the file at path '.gitignore':
+
+__pycache__
+venv
+build
+dist
+*.spec
+.git
+*.mp3
+
+For context, here is the file at path 'config.json':
+
+{
+    "toggle_timer": "1",
+    "toggle_settings": "ctrl_l+shift+s",
+    "toggle_crosshair": "ctrl_l+shift+c",
+    "toggle_visibility": "ctrl_l+shift+a",
+    "quit": "ctrl_l+shift+q"
+}
+
+For context, here is the file at path 'config_window.py':
+
+import json
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout
+from PyQt5.QtCore import pyqtSlot, pyqtSignal, Qt
+from pynput.keyboard import Controller, Key
+from time import sleep
+
+class ConfigWindow(QWidget):
+    update_ui_signal = pyqtSignal(str)
+    labelStyle = "color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);"
+    buttonStyle = """
+    QPushButton {
+        color: white; 
+        font-size: 16pt; 
+        background-color: rgba(0, 0, 0, 0); 
+        border: 1px solid white; 
+        border-radius: 0px;   
+    }
+    
+    QPushButton:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    QPushButton:pressed {
+        background-color: rgba(255, 255, 255, 0.3);
+    }
+    """
+
+    recordingButtonStyle = """
+    QPushButton {
+        color: white; 
+        font-size: 16pt; 
+        background-color: rgba(0, 0, 0, 0); 
+        border: 1px solid red; 
+        border-radius: 0px;   
+    }
+    """
+    def __init__(self, game_overlay, keybind_manager):
+        super().__init__()
+        self.game_overlay = game_overlay
+        self.keybind_manager = keybind_manager
+
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        self.setStyleSheet("background-color: rgba(70, 70, 70, 0.3); border-radius: 0px;")
+
+        smudge_timer_pos = self.game_overlay.countdown_timer.pos()
+        smudge_timer_width = self.game_overlay.countdown_timer.width() - 20
+        self.resize(smudge_timer_width, self.sizeHint().height())
+        self.move(smudge_timer_pos.x() + 10, smudge_timer_pos.y() + self.game_overlay.countdown_timer.height())
+
+        layout = QVBoxLayout()
+
+        self.timer_layout = QHBoxLayout()
+        self.timer_label = QLabel('Toggle Timer:')
+        self.timer_label.setStyleSheet(self.labelStyle)
+        self.timer_button = QPushButton()
+        self.timer_button.setStyleSheet(self.buttonStyle)
+        self.timer_layout.addWidget(self.timer_label)
+        self.timer_layout.addWidget(self.timer_button)
+        layout.addLayout(self.timer_layout)
+
+        self.toggle_layout = QHBoxLayout()
+        self.toggle_label = QLabel('Toggle Visibility:')
+        self.toggle_label.setStyleSheet(self.labelStyle)
+        self.toggle_button = QPushButton()
+        self.toggle_button.setStyleSheet(self.buttonStyle)
+        self.toggle_layout.addWidget(self.toggle_label)
+        self.toggle_layout.addWidget(self.toggle_button)
+        layout.addLayout(self.toggle_layout)
+        
+        self.crosshair_layout = QHBoxLayout()
+        self.crosshair_label = QLabel('Toggle Crosshair:')
+        self.crosshair_label.setStyleSheet(self.labelStyle)
+        self.crosshair_button = QPushButton()
+        self.crosshair_button.setStyleSheet(self.buttonStyle)
+        self.crosshair_layout.addWidget(self.crosshair_label)
+        self.crosshair_layout.addWidget(self.crosshair_button)
+        layout.addLayout(self.crosshair_layout)
+        
+        self.settings_layout = QHBoxLayout()
+        self.settings_label = QLabel('Show Settings:')
+        self.settings_label.setStyleSheet(self.labelStyle)
+        self.settings_button = QPushButton()
+        self.settings_button.setStyleSheet(self.buttonStyle)
+        self.settings_layout.addWidget(self.settings_label)
+        self.settings_layout.addWidget(self.settings_button)
+        layout.addLayout(self.settings_layout)
+        
+        self.quit_layout = QHBoxLayout()
+        self.quit_label = QLabel('Quit:')
+        self.quit_label.setStyleSheet(self.labelStyle)
+        self.quit_button = QPushButton()
+        self.quit_button.setStyleSheet(self.buttonStyle)
+        self.quit_layout.addWidget(self.quit_label)
+        self.quit_layout.addWidget(self.quit_button)
+        layout.addLayout(self.quit_layout)
+        
+        self.setLayout(layout)
+        
+        self.load_current_keybinds()
+
+        def record_timer_button():
+            self.timer_button.setText('Press a key...')
+            self.timer_button.setStyleSheet(self.recordingButtonStyle)
+            self.record_keybind('toggle_timer')
+        
+        def record_crosshair_button():
+            self.crosshair_button.setText('Press a key...')
+            self.crosshair_button.setStyleSheet(self.recordingButtonStyle)
+            self.record_keybind('toggle_crosshair')
+        
+        def record_toggle_button():
+            self.toggle_button.setText('Press a key...')
+            self.toggle_button.setStyleSheet(self.recordingButtonStyle)
+            self.record_keybind('toggle_visibility')
+
+        def record_quit_button():
+            self.quit_button.setText('Press a key...')
+            self.quit_button.setStyleSheet(self.recordingButtonStyle)
+            self.record_keybind('quit')
+
+        def record_settings_button():
+            self.settings_button.setText('Press a key...')
+            self.settings_button.setStyleSheet(self.recordingButtonStyle)
+            self.record_keybind('toggle_settings')
+        
+        self.timer_button.clicked.connect(lambda: record_timer_button())
+        self.crosshair_button.clicked.connect(lambda: record_crosshair_button())
+        self.toggle_button.clicked.connect(lambda: record_toggle_button())
+        self.quit_button.clicked.connect(lambda: record_quit_button())
+        self.settings_button.clicked.connect(lambda: record_settings_button())
+        self.update_ui_signal.connect(self.update_ui)
+    
+    def load_current_keybinds(self):
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+            self.timer_button.setText(self.keybind_manager.chord_to_user_friendly(config['toggle_timer']))
+            self.crosshair_button.setText(self.keybind_manager.chord_to_user_friendly(config['toggle_crosshair']))
+            self.toggle_button.setText(self.keybind_manager.chord_to_user_friendly(config['toggle_visibility']))
+            self.quit_button.setText(self.keybind_manager.chord_to_user_friendly(config['quit']))
+            self.settings_button.setText(self.keybind_manager.chord_to_user_friendly(config['toggle_settings']))
+    
+    @pyqtSlot(str)
+    def update_ui(self, chord):
+        chord = self.keybind_manager.chord_to_user_friendly(chord)
+        if self.current_action == 'toggle_visibility':
+            self.toggle_button.setText(chord)
+        elif self.current_action == 'toggle_timer':
+            self.timer_button.setText(chord)
+        elif self.current_action == 'toggle_crosshair':
+            self.crosshair_button.setText(chord)
+        elif self.current_action == 'quit':
+            self.quit_button.setText(chord)
+        elif self.current_action == 'toggle_settings':
+            self.settings_button.setText(chord)
+
+        self.timer_button.setStyleSheet(self.buttonStyle)
+        self.current_action = None
+
+    def on_record_keybind(self, action, chord):
+        self.update_ui_signal.emit(chord)
+
+    def record_keybind(self, action):
+        self.current_action = action
+        self.keybind_manager.record(action, self.on_record_keybind)
+        
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.activateWindow()
+
+
+
+
+
+
+For context, here is the file at path 'context.py':
+
+import os
+import pathspec
+
+def load_gitignore(gitignore_path=".gitignore"):
+    with open(gitignore_path, 'r') as file:
+        gitignore = file.read()
+    return pathspec.PathSpec.from_lines('gitwildmatch', gitignore.splitlines())
+
+def generate_context(base_path="."):
+    gitignore = load_gitignore()
+    context = {}
+
+    for root, dirs, files in os.walk(base_path):
+        for file in files:
+            path = os.path.join(root, file)
+            relative_path = os.path.relpath(path, base_path)
+
+            if not gitignore.match_file(relative_path):
+                with open(path, "r") as file:
+                    try:
+                        content = file.read()
+                        context[relative_path] = content
+                    except Exception as e:
+                        print(f"Error reading file {path}: {e}")
+
+    return context
+
+def write_context_to_file(context, output_file="context.txt"):
+    with open(output_file, "w") as file:
+        for path, content in context.items():
+            file.write(f"For context, here is the file at path '{path}':\n\n")
+            file.write(content)
+            file.write("\n\n")
+
+context = generate_context()
+write_context_to_file(context)
+
+For context, here is the file at path 'crosshair.py':
+
+from PyQt5.QtWidgets import QWidget
+from PyQt5.QtGui import QPainter, QColor
+from PyQt5.QtCore import Qt
+
+class Crosshair(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.show_crosshair = True
+
+    def paintEvent(self, event):
+        if self.show_crosshair:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setBrush(QColor(0, 255, 0))
+            painter.setPen(QColor(0, 255, 0))
+            painter.drawEllipse(int(self.width() / 2) - 5, int(self.height() / 2) - 5, 6, 6)
+
+    def toggle_crosshair(self):
+        self.show_crosshair = not self.show_crosshair
+        self.update()
+
+For context, here is the file at path 'game_overlay.py':
+
+import ctypes
+from PyQt5.QtWidgets import QWidget, QMessageBox, QVBoxLayout
+from PyQt5.QtCore import Qt, QTimer, QTime, QMetaObject
+from config_window import ConfigWindow
+from keybind_manager import KeybindManager
+from smudge_timer import SmudgeTimer
+from crosshair import Crosshair
+
+
+class GameOverlay(QWidget):
+    def __init__(self, rect):
+        super().__init__()
+        self.keybind_manager = KeybindManager(self)
+        
+        # Set the window to be transparent and always on top
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.WindowTransparentForInput)
+
+        self.setGeometry(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
+
+        # Set up a QTime to keep track of the elapsed time
+        self.time_elapsed = QTime(0, 0)
+
+        # Create the SmudgeTimer widget
+        self.countdown_timer = SmudgeTimer(self, 180)
+        self.crosshair = Crosshair(self)
+        self.crosshair.setGeometry(int(self.width() / 2) - 3, int(self.height() / 2) - 3, 11, 11)
+
+        # Add the SmudgeTimer widget to the layout
+        self.countdown_timer.setGeometry(0, 0, 400, 125)
+        self.countdown_timer.move(self.width() - self.countdown_timer.width(), 0)
+
+        self.config_window = ConfigWindow(self, self.keybind_manager)
+
+
+    def toggle_settings_action(self):  
+        if self.config_window.isVisible():
+            QMetaObject.invokeMethod(self.config_window, "hide", Qt.QueuedConnection) 
+        else:
+            QMetaObject.invokeMethod(self.config_window, "show", Qt.QueuedConnection) 
+     
+
+    def update_timer_progress(self):
+        if self.timer_started:
+            self.remaining_time -= 1
+            if self.remaining_time <= 0:
+                self.remaining_time = 0
+                self.timer.stop()
+            self.update()  # Update the UI to redraw the progress bar
+
+    def toggle_timer_action(self):
+        if self.countdown_timer.timer.isActive():
+            self.countdown_timer.stop()
+            self.timer_started = False
+        else:
+            self.countdown_timer.start()
+            self.countdown_timer.reset()
+            self.timer_started = True
+
+
+    def toggle_visibility_action(self):
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+    
+    def toggle_crosshair_action(self):
+        self.crosshair.toggle_crosshair()
+
+    def quit_action(self):
+        self.close()
+        self.config_window.close()
+        exit()
+        
+  
+
+For context, here is the file at path 'keybind_manager.py':
+
+import json
+from pynput import keyboard
+from pynput.keyboard import KeyCode
+
+
+control_chars = {
+    '\x01': 'a', '\x02': 'b', '\x03': 'c', '\x04': 'd', '\x05': 'e', '\x06': 'f', '\x07': 'g', '\x08': 'h',
+    '\x09': 'i', '\x0A': 'j', '\x0B': 'k', '\x0C': 'l', '\x0D': 'm', '\x0E': 'n', '\x0F': 'o', '\x10': 'p',
+    '\x11': 'q', '\x12': 'r', '\x13': 's', '\x14': 't', '\x15': 'u', '\x16': 'v', '\x17': 'w', '\x18': 'x',
+    '\x19': 'y', '\x1A': 'z', '\x1B': '[', '\x1C': '\\', '\x1D': ']', '\x1E': '^', '\x1F': '_'
+}
+
+class KeybindManager:
+    def __init__(self, target):
+        self.target = target
+        self.load_config()
+        self.current_keys = set()
+        self.is_recording = False
+        self.recorded_chord = []
+        self.current_action = None
+        self.callback = None
+        self.listener = keyboard.Listener(
+            on_press=self.on_press,
+            on_release=self.on_release)
+        self.listener.start()
+
+    def load_config(self):
+        with open('config.json', 'r') as f:
+            self.config = json.load(f)
+
+    def update_config(self, action, chord):
+        self.config[action] = chord
+        with open('config.json', 'w') as f:
+            json.dump(self.config, f, indent=4)
+
+    def replace_control_chars(self, key_name):
+        return control_chars.get(key_name, key_name)
+
+    def get_key_name(self, key):
+        if hasattr(key, 'name'):
+            return key.name
+        else:
+            if type(key) == type(KeyCode()) and '\\' in repr(key):
+                return self.replace_control_chars(str(key.char))
+            return str(key.char)
+
+    def get_control_key_index(self, key_name):
+        index_map = {'ctrl_l': 0, 'ctrl_r': 1, 'alt_l': 2, 'alt_r': 3, 'shift': 4, 'shift_r': 5}
+        return index_map.get(key_name, -1)
+
+    def chord_to_user_friendly(self, chord):
+        key_name_map = {
+            'ctrl_l': 'Ctrl',
+            'ctrl_r': 'Ctrl',
+            'alt_l': 'Alt',
+            'alt_r': 'Alt',
+            'shift': 'Shift',
+            'shift_r': 'Shift'
+        }
+
+        key_names = chord.split('+')
+        user_friendly_key_names = [key_name_map.get(key_name, key_name) for key_name in key_names]
+        user_friendly_chord = ' + '.join(user_friendly_key_names)
+        return user_friendly_chord
+
+    def on_press(self, key):
+        if self.is_recording:
+            key_name = self.get_key_name(key)
+            if key_name not in ('ctrl_l', 'ctrl_r', 'alt_l', 'alt_r', 'shift', 'shift_r') and key_name not in self.recorded_chord:
+                self.recorded_chord.append(key_name)
+                self.is_recording = False
+                self.update_config(self.current_action, '+'.join(self.recorded_chord))
+                if self.callback:
+                    self.callback(self.current_action, '+'.join(self.recorded_chord))
+            elif key_name in ('ctrl_l', 'ctrl_r', 'alt_l', 'alt_r', 'shift', 'shift_r') and key_name not in self.recorded_chord:
+                self.recorded_chord.insert(self.get_control_key_index(key_name), key_name)
+        else:
+            key_name = self.get_key_name(key)
+            self.current_keys.add(key_name)
+            for action, chord in self.config.items():
+                chord_keys = set(chord.split('+'))
+                if chord_keys.issubset(self.current_keys):
+                    getattr(self.target, f"{action}_action")()
+
+    def on_release(self, key):
+        key_name = self.get_key_name(key)
+        if key_name in self.current_keys:
+            self.current_keys.remove(key_name)
+
+    def record(self, action, callback):
+        self.is_recording = True
+        self.recorded_chord = []
+        self.current_action = action
+        self.callback = callback
+
+For context, here is the file at path 'main.py':
+
+import sys
+import os
+import ctypes
+from PyQt5.QtWidgets import QApplication, QMessageBox, QWidget
+from PyQt5.QtCore import QTime, QTimer, QRect
+from game_overlay import GameOverlay
+import signal
+import json
+
+class PhasOverlay(QWidget):
+    overlay = None
+
+    def __init__(self):
+        super().__init__()
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.check_target_window)
+        self.timer.start(1000)  # Check every second
+        self.time_elapsed = QTime(0, 0)
+        
+
+    def check_target_window(self):
+            hwnd = ctypes.windll.user32.FindWindowW(None, "Phasmophobia")
+            if hwnd:
+                rect = ctypes.wintypes.RECT()
+                ctypes.windll.user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                self.overlay = GameOverlay(rect)
+                self.overlay.show()
+                self.timer.stop()
+            else:
+                self.time_elapsed = self.time_elapsed.addSecs(1)
+                if self.time_elapsed >= QTime(0, 2):  # 2 minutes
+                    self.timer.stop()
+                    QMessageBox.information(self, "Game Not Found", "The Phasmophobia game was not found within the specified time (2 minutes).")
+                    self.quit_application()
+
+
+def generate_default_config():
+    if not os.path.exists('config.json'):
+        with open('config.json', 'w') as f:
+            json.dump({
+              'toggle_timer': 't',
+              'toggle_crosshair': 'ctrl_l+shift+c',
+              'toggle_settings': 'ctrl_l+shift+s', 
+              'toggle_visibility': 'ctrl_l+shift+a', 
+              'quit': 'ctrl_l+shift+q'
+              }, f, indent=4)
+
+def signal_handler(signal, frame):
+    print("Ctrl+C pressed. Exiting...")
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    generate_default_config()
+    signal.signal(signal.SIGINT, signal_handler)
+
+    app = QApplication(sys.argv)
+    phasOverlay = PhasOverlay()
+    
+    sys.exit(app.exec_())
+
+For context, here is the file at path 'requirements.txt':
+
+pyqt5
+pynput
+
+For context, here is the file at path 'smudge_timer.py':
+
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QGridLayout
+from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QMetaObject, QUrl
+from PyQt5.QtGui import QPainter, QColor, QPen
+
+class SmudgeBar(QProgressBar):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""QProgressBar { 
+          background-color: rgba(70, 70, 70, 1); 
+          border-radius: 0px; 
+        }
+
+        QProgressBar::chunk {
+           background-color: rgba(255, 255, 255, 1); 
+           border-radius: 0px; 
+           width: 1px;
+           }
+        """)
+        self.setRange(0, 180)
+        self.setValue(180)
+        self.setTextVisible(False)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        pen = QPen(QColor(0, 0, 0))
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.drawLine(int(self.width() / 2), 0, int(self.width() / 2), self.height())
+        painter.drawLine(int(self.width() * 2 / 3), 0, int(self.width() * 2 / 3), self.height())
+
+class SmudgeTimer(QWidget):
+    time_updated = pyqtSignal(int)
+
+    def __init__(self, parent=None, total_time=180):
+        super().__init__(parent)
+        self.total_time = total_time
+        self.remaining_time = total_time
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_time)
+        self.timer.setInterval(1000)
+
+        self.countdown_audio = QMediaPlayer()
+        self.countdown_audio.setMedia(QMediaContent(QUrl.fromLocalFile("./countdown.mp3")))
+
+        self.progress_bar = SmudgeBar(self)
+
+        layout = QGridLayout()
+        
+        # Add a label for the progress bar
+        self.label = QLabel(self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        self.label.setText(self.format_time(self.remaining_time))
+
+        self.ghost_label = QLabel(self)
+        self.ghost_label.setAlignment(Qt.AlignCenter)
+        self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        self.ghost_label.setText("None")
+
+        self.timer_state_label = QLabel(self)
+        self.timer_state_label.setFixedSize(10, 10)  # Set a fixed size for the label
+        self.timer_state_label.setStyleSheet("background-color: red; border-radius: 10px;")        
+
+        # Add the progress bar and label widgets to a container widget
+        container = QWidget(self)
+        container.setStyleSheet("background-color: rgba(70, 70, 70, 0.3); border-radius: 0px;")
+        container_layout = QGridLayout(container)
+        container_layout.setContentsMargins(10, 10, 10, 10)
+
+        container_layout.addWidget(self.progress_bar, 0, 0)
+        container_layout.addWidget(self.timer_state_label, 1, 0)
+        container_layout.addWidget(self.label, 1, 0, Qt.AlignCenter)
+        container_layout.addWidget(self.ghost_label, 2, 0, Qt.AlignCenter)
+
+        # Add the container widget to the layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.addWidget(container)
+        self.setLayout(layout)
+
+    def start(self):
+        QMetaObject.invokeMethod(self.timer, "start", Qt.QueuedConnection)
+        self.timer_state_label.setStyleSheet("background-color: green; border-radius: 10px;")
+
+    def stop(self):
+        QMetaObject.invokeMethod(self.timer, "stop", Qt.QueuedConnection)
+        self.timer_state_label.setStyleSheet("background-color: red; border-radius: 10px;")
+
+    def reset(self):
+        self.remaining_time = self.total_time
+        self.progress_bar.setValue(self.remaining_time)
+        self.label.setText(self.format_time(self.remaining_time))
+
+
+    def update_time(self):
+        self.remaining_time -= 1
+        self.progress_bar.setValue(self.remaining_time)
+        self.label.setText(self.format_time(self.remaining_time))
+        self.time_updated.emit(self.remaining_time)
+
+        # play audio after 1 minute, 1.5 minutes, and 3 minutes. the audio clip counts 5 4 3 2 1 ding, the ding should play at the prior specified times with that offset.
+        if self.remaining_time == 125:
+            self.countdown_audio.play()
+        elif self.remaining_time == 95:
+            self.countdown_audio.play()
+        elif self.remaining_time == 5:
+            self.countdown_audio.play()
+
+        if self.remaining_time <= 0:  # 3 minutes elapsed
+            self.ghost_label.setText("Spirit")
+            self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        elif self.remaining_time <= 90:  # 1:30 minutes elapsed
+            self.ghost_label.setText("Standard")
+            self.ghost_label.setStyleSheet("color: yellow; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        elif self.remaining_time <= 120:  # 1 minute elapsed
+            self.ghost_label.setText("Demon")
+            self.ghost_label.setStyleSheet("color: red; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        elif self.remaining_time <= 180:  # 1 minute elapsed
+            self.ghost_label.setText("None")
+            self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
+        
+        if self.remaining_time <= 0:
+            self.timer.stop()
+
+    def format_time(self, seconds):
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes:01d}:{seconds:02d}"
+

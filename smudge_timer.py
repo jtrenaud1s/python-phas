@@ -31,7 +31,7 @@ class SmudgeBar(QProgressBar):
         painter.drawLine(int(self.width() * 2 / 3), 0, int(self.width() * 2 / 3), self.height())
 
 class SmudgeTimer(QWidget):
-    time_updated = pyqtSignal(int)
+    #time_updated = pyqtSignal(int)
 
     def __init__(self, parent=None, total_time=180):
         super().__init__(parent)
@@ -88,18 +88,19 @@ class SmudgeTimer(QWidget):
     def stop(self):
         QMetaObject.invokeMethod(self.timer, "stop", Qt.QueuedConnection)
         self.timer_state_label.setStyleSheet("background-color: red; border-radius: 10px;")
+        self.countdown_audio.stop()
 
     def reset(self):
         self.remaining_time = self.total_time
         self.progress_bar.setValue(self.remaining_time)
         self.label.setText(self.format_time(self.remaining_time))
-
+        self.ghost_label.setText("None")
+        self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
 
     def update_time(self):
         self.remaining_time -= 1
         self.progress_bar.setValue(self.remaining_time)
         self.label.setText(self.format_time(self.remaining_time))
-        self.time_updated.emit(self.remaining_time)
 
         # play audio after 1 minute, 1.5 minutes, and 3 minutes. the audio clip counts 5 4 3 2 1 ding, the ding should play at the prior specified times with that offset.
         if self.remaining_time == 125:
@@ -122,8 +123,8 @@ class SmudgeTimer(QWidget):
             self.ghost_label.setText("None")
             self.ghost_label.setStyleSheet("color: white; font-size: 16pt; background-color: rgba(0, 0, 0, 0);")
         
-        if self.remaining_time == 0:
-            self.timer.stop()
+        if self.remaining_time <= 0:
+            self.stop()
 
     def format_time(self, seconds):
         minutes = seconds // 60
